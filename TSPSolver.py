@@ -188,12 +188,18 @@ class TSPSolver:
 		max queue size, total number of states created, and number of pruned states.</returns> 
 	'''
 
-
+	#############
+	# core functions
+	#############
 	def branchAndBound( self, time_allowance=60.0 ):
-		pass
+		#init adjacency matrix
+		matrix = self.makeMatrixFromEdgelist()
 
-	def calculateLowerBound(self):
-		pass
+		self.lowerBound, self.lowerBoundMatrix = self.calculateLowerBound(matrix)
+		self.upperBound = self.calculateUpperBound()
+
+	def calculateLowerBound(self, matrix):
+		return self.normalizeMatrix(matrix)
 
 	def calculateUpperBound(self):
 		bestResult = self.greedy(60.0)
@@ -206,6 +212,48 @@ class TSPSolver:
 
 	def doBranch(self):
 		pass
+
+	#############
+	# aux functions
+	#############
+	def normalizeMatrix(self, matrix):
+		rows = len(matrix)
+		columns = len(matrix[0])
+		cost = 0
+		newMatrix = matrix
+
+		for i in range(rows):
+			smallestVal = math.inf
+			for j in range(columns):
+				if newMatrix[i][j] < smallestVal:
+					smallestVal = newMatrix[i][j]
+			for j in range(columns):
+				newMatrix[i][j] = newMatrix[i][j] - smallestVal
+			cost += smallestVal
+
+		for i in range(columns):
+			smallestVal = math.inf
+			for j in range(rows):
+				if newMatrix[i][j] < smallestVal:
+					smallestVal = newMatrix[i][j]
+			for j in range(rows):
+				newMatrix[i][j] = newMatrix[i][j] - smallestVal
+			cost += smallestVal
+
+
+		return cost, newMatrix
+
+	def makeMatrixFromEdgelist(self):
+		edges = self._scenario.getEdges()
+		cities = self._scenario.getCities()
+		matrix = np.array([[math.inf for i in range(len(edges))] for i in range(len(edges[0]))])
+
+		for i in range(len(edges)):
+			for j in range(len(edges[0])):
+				if edges[i][j] == True:
+					matrix[i][j] = self.calculateDistance(cities[i], cities[j])
+
+		return matrix
 
 
 
