@@ -23,9 +23,6 @@ class TSPSolver:
 	def __init__( self, gui_view ):
 		self._scenario = None
 
-	def setupWithScenario( self, scenario ):
-		self._scenario = scenario
-
 
 	''' <summary>
 		This is the entry point for the default solver
@@ -192,14 +189,21 @@ class TSPSolver:
 	# core functions
 	#############
 	def branchAndBound( self, time_allowance=60.0 ):
+		start_time = time.time()
+		self.cities = self._scenario.getCities()
+		self.pq = []
+		self.depthPriority = 10
+		self.numNodes = len(self.cities)
 		#init adjacency matrix
-		matrix = self.makeMatrixFromEdgelist()
+		self.matrix = self.makeMatrixFromEdgelist()
 
-		self.lowerBound, self.lowerBoundMatrix = self.calculateLowerBound(matrix)
+		self.lowerBound, self.lowerBoundMatrix = self.calculateLowerBound()
 		self.upperBound = self.calculateUpperBound()
+		startingState = BBState(0, self.lowerBoundMatrix, 0)
+		self.doBranch(startingState)
 
-	def calculateLowerBound(self, matrix):
-		return self.normalizeMatrix(matrix)
+	def calculateLowerBound(self):
+		return self.normalizeMatrixInit(self.matrix)
 
 	def calculateUpperBound(self):
 		bestResult = self.greedy(60.0)
@@ -208,15 +212,75 @@ class TSPSolver:
 			if result['cost'] < bestResult['cost']:
 				bestResult = result
 
-		return bestResult['cost']
+		cost = 0
+		previousCity = None
+		for currentCity in bestResult['soln'].route:
+			if previousCity != None:
+				cost += self.calculateDistance(currentCity, previousCity)
 
-	def doBranch(self):
-		pass
+			previousCity = currentCity
+
+		return cost
+
+	def doBranch(self, BBstate):
+		for i in range(len(self.matrix[BBState.nodeNumber])):
+			if self.matrix[BBState.nodeNumber][i] == True:
+				newState = self.calculateEdge(BBState, i)
+				if newState.cost < self.upperBound:
+					heapq.heappush(self.pq, (self.calculatePriority(newState.level, newState.cost), newState))
+
+
+
+
+
 
 	#############
 	# aux functions
 	#############
-	def normalizeMatrix(self, matrix):
+	def calculateEdge(self, BBState, nextStateInt):
+		newMatrix = BBState.matrix
+		for i in len(newMatrix):
+			newMatrix[i][BBState.nodeNumber] = math.inf
+		for i in len(newMatrix):
+			newMatrix[nextStateInt][i] = math.inf
+
+		cost, newMatrix = self.normalizeMatrix(newMatrix, BBState.nodeNumber, nextStateInt)
+		newState = BBState(BBState.level + 1, newMatrix, nextStateInt)
+		newState.path.append(BBState.nodeNumber)
+		newState.cost = cost
+		return newState
+
+	#returns cost, newMatrix
+	def normalizeMatrix(self, matrix, clearedRow, clearedColumn):
+		rows = len(matrix)
+		columns = len(matrix[0])
+		cost = 0
+		newMatrix = matrix
+
+		for i in range(rows):
+			if i == clearedRow:
+				smallestVal = math.inf
+				for j in range(columns):
+					if newMatrix[i][j] < smallestVal:
+						smallestVal = newMatrix[i][j]
+				for j in range(columns):
+					newMatrix[i][j] = newMatrix[i][j] - smallestVal
+				cost += smallestVal
+
+		for i in range(columns):
+			if i == clearedColumn:
+				smallestVal = math.inf
+				for j in range(rows):
+					if newMatrix[i][j] < smallestVal:
+						smallestVal = newMatrix[i][j]
+				for j in range(rows):
+					newMatrix[i][j] = newMatrix[i][j] - smallestVal
+				cost += smallestVal
+
+
+		return cost, newMatrix
+
+	def normalizeMatrixInit(self, matrix):
 		rows = len(matrix)
 		columns = len(matrix[0])
 		cost = 0
@@ -255,6 +319,11 @@ class TSPSolver:
 
 		return matrix
 
+	#calculates priority score
+	def calculatePriority(self, level, cost):
+		costRatio = self.upperBound - cost/self.upperBound
+		levelRatio = level * self.depthPriority / self.numNodes
+		return (costRatio + levelRatio) * 100
 
 
 	''' <summary>
@@ -270,5 +339,14 @@ class TSPSolver:
 		pass
 		
 
+
+
+class BBState:
+	def __init__(self, level, matrix, nodeNumber):
+		self.level = level
+		self.matrix = matrix
+		self.nodeNumber = nodeNumber
+		self.cost = 0
+		self.path = []
 
 
