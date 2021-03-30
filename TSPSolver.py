@@ -18,6 +18,7 @@ import heapq
 import itertools
 
 NUM_GREEDY_TRIES_BB = 5
+INF = 999999
 
 class TSPSolver:
 	def __init__( self, gui_view ):
@@ -252,40 +253,40 @@ class TSPSolver:
 		rows = len(matrix)
 		columns = len(matrix[0])
 		cost = 0
-		newMatrix = matrix
+		newMatrix = matrix.copy()
 		#TODO make sure it works and see why some city distances are zero
 
 		rowsToCheck = []
 		columnsToCheck = []
 		#zero out row and column to clear and determine which rows columns need to be normalized
 		for i in range(len(newMatrix)):
-			if newMatrix[i][rowToClear] > 0:
+			if newMatrix[i][rowToClear] >= 0:
 				newMatrix[i][rowToClear] = -1
 				if rowsToCheck.__contains__(i) == False:
 					rowsToCheck.append(i)
 		for i in range(len(newMatrix)):
-			if newMatrix[columnToClear][i] > 0:
+			if newMatrix[columnToClear][i] >= 0:
 				newMatrix[columnToClear][i] = -1
 				if columnsToCheck.__contains__(i) == False:
 					columnsToCheck.append(i)
 		rowsToCheck.remove(columnToClear)
 
 		for i in rowsToCheck:
-			smallestVal = math.inf
+			smallestVal = INF
 			for j in range(columns):
-				if newMatrix[i][j] < smallestVal and newMatrix[i][j] > 0:
+				if newMatrix[i][j] < smallestVal and newMatrix[i][j] >= 0:
 					smallestVal = newMatrix[i][j]
 			for j in range(columns):
 				newMatrix[i][j] = newMatrix[i][j] - smallestVal
 			cost += smallestVal
 
 		for i in columnsToCheck:
-			smallestVal = math.inf
-			for j in range(rows) and newMatrix[i][j] > 0:
-				if newMatrix[i][j] < smallestVal:
-					smallestVal = newMatrix[i][j]
+			smallestVal = INF
 			for j in range(rows):
-				newMatrix[i][j] = newMatrix[i][j] - smallestVal
+				if newMatrix[j][i] < smallestVal  and newMatrix[j][i] >= 0:
+					smallestVal = newMatrix[j][i]
+			for j in range(rows):
+				newMatrix[j][i] = newMatrix[j][i] - smallestVal
 			cost += smallestVal
 
 
@@ -309,10 +310,10 @@ class TSPSolver:
 		for i in range(columns):
 			smallestVal = math.inf
 			for j in range(rows):
-				if newMatrix[i][j] < smallestVal:
-					smallestVal = newMatrix[i][j]
+				if newMatrix[j][i] < smallestVal:
+					smallestVal = newMatrix[j][i]
 			for j in range(rows):
-				newMatrix[i][j] = newMatrix[i][j] - smallestVal
+				newMatrix[j][i] = newMatrix[j][i] - smallestVal
 			cost += smallestVal
 
 
@@ -361,6 +362,3 @@ class BBState:
 		self.path = []
 
 
-if __name__ == '__main__':
-	# city1 = City()
-	# print(TSPSolver.calculateDistance())
