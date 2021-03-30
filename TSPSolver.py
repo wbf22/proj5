@@ -23,6 +23,8 @@ class TSPSolver:
 	def __init__( self, gui_view ):
 		self._scenario = None
 
+	def setupWithScenario(self, scenario):
+		self._scenario = scenario
 
 	''' <summary>
 		This is the entry point for the default solver
@@ -171,7 +173,7 @@ class TSPSolver:
 		y = city1._y - city2._y
 		x = city1._x - city2._x
 
-		dist = np.sqrt(y**2 + x**2)
+		dist = np.sqrt(y**2 + x**2) * 1000
 
 		return dist
 
@@ -196,10 +198,12 @@ class TSPSolver:
 		self.numNodes = len(self.cities)
 		#init adjacency matrix
 		self.matrix = self.makeMatrixFromEdgelist()
+		self.edges = self._scenario.getEdges()
 
 		self.lowerBound, self.lowerBoundMatrix = self.calculateLowerBound()
 		self.upperBound = self.calculateUpperBound()
 		startingState = BBState(0, self.lowerBoundMatrix, 0)
+		startingState.cost = self.lowerBound
 		self.doBranch(startingState)
 
 	def calculateLowerBound(self):
@@ -222,60 +226,67 @@ class TSPSolver:
 
 		return cost
 
-	def doBranch(self, BBstate):
-		for i in range(len(self.matrix[BBState.nodeNumber])):
-			if self.matrix[BBState.nodeNumber][i] == True:
-				newState = self.calculateEdge(BBState, i)
+	def doBranch(self, state):
+		for i in range(len(self.edges)):
+			if self.edges[state.nodeNumber][i] == True:
+				newState = self.calculateEdge(state, i)
 				if newState.cost < self.upperBound:
 					heapq.heappush(self.pq, (self.calculatePriority(newState.level, newState.cost), newState))
-
-
-
-
 
 
 	#############
 	# aux functions
 	#############
-	def calculateEdge(self, BBState, nextStateInt):
-		newMatrix = BBState.matrix
-		for i in len(newMatrix):
-			newMatrix[i][BBState.nodeNumber] = math.inf
-		for i in len(newMatrix):
-			newMatrix[nextStateInt][i] = math.inf
+	def calculateEdge(self, state, nextStateInt):
+		newMatrix = state.matrix.copy()
 
-		cost, newMatrix = self.normalizeMatrix(newMatrix, BBState.nodeNumber, nextStateInt)
-		newState = BBState(BBState.level + 1, newMatrix, nextStateInt)
-		newState.path.append(BBState.nodeNumber)
+
+		cost, newMatrix = self.normalizeMatrix(newMatrix, state.nodeNumber, nextStateInt)
+		newState = BBState(state.level + 1, newMatrix, nextStateInt)
+		newState.path.append(state.nodeNumber)
 		newState.cost = cost
 		return newState
 
 	#returns cost, newMatrix
-	def normalizeMatrix(self, matrix, clearedRow, clearedColumn):
+	def normalizeMatrix(self, matrix, rowToClear, columnToClear):
 		rows = len(matrix)
 		columns = len(matrix[0])
 		cost = 0
 		newMatrix = matrix
+		#TODO make sure it works and see why some city distances are zero
 
-		for i in range(rows):
-			if i == clearedRow:
-				smallestVal = math.inf
-				for j in range(columns):
-					if newMatrix[i][j] < smallestVal:
-						smallestVal = newMatrix[i][j]
-				for j in range(columns):
-					newMatrix[i][j] = newMatrix[i][j] - smallestVal
-				cost += smallestVal
+		rowsToCheck = []
+		columnsToCheck = []
+		#zero out row and column to clear and determine which rows columns need to be normalized
+		for i in range(len(newMatrix)):
+			if newMatrix[i][rowToClear] > 0:
+				newMatrix[i][rowToClear] = -1
+				if rowsToCheck.__contains__(i) == False:
+					rowsToCheck.append(i)
+		for i in range(len(newMatrix)):
+			if newMatrix[columnToClear][i] > 0:
+				newMatrix[columnToClear][i] = -1
+				if columnsToCheck.__contains__(i) == False:
+					columnsToCheck.append(i)
+		rowsToCheck.remove(columnToClear)
 
-		for i in range(columns):
-			if i == clearedColumn:
-				smallestVal = math.inf
-				for j in range(rows):
-					if newMatrix[i][j] < smallestVal:
-						smallestVal = newMatrix[i][j]
-				for j in range(rows):
-					newMatrix[i][j] = newMatrix[i][j] - smallestVal
-				cost += smallestVal
+		for i in rowsToCheck:
+			smallestVal = math.inf
+			for j in range(columns):
+				if newMatrix[i][j] < smallestVal and newMatrix[i][j] > 0:
+					smallestVal = newMatrix[i][j]
+			for j in range(columns):
+				newMatrix[i][j] = newMatrix[i][j] - smallestVal
+			cost += smallestVal
+
+		for i in columnsToCheck:
+			smallestVal = math.inf
+			for j in range(rows) and newMatrix[i][j] > 0:
+				if newMatrix[i][j] < smallestVal:
+					smallestVal = newMatrix[i][j]
+			for j in range(rows):
+				newMatrix[i][j] = newMatrix[i][j] - smallestVal
+			cost += smallestVal
 
 
 		return cost, newMatrix
@@ -350,3 +361,6 @@ class BBState:
 		self.path = []
 
 
+if __name__ == '__main__':
+	# city1 = City()
+	# print(TSPSolver.calculateDistance())

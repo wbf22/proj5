@@ -194,6 +194,7 @@ class PointLineView( QWidget ):
 
 class Proj5GUI( QMainWindow ):
 
+
 	def __init__( self ):
 		super(Proj5GUI,self).__init__()
 
