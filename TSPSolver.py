@@ -211,6 +211,7 @@ class TSPSolver:
 		return self.normalizeMatrixInit(self.matrix)
 
 	def calculateUpperBound(self):
+		#TODO make greedy change starting node
 		bestResult = self.greedy(60.0)
 		for i in range(NUM_GREEDY_TRIES_BB):
 			result = self.greedy(60.0)
@@ -224,6 +225,9 @@ class TSPSolver:
 				cost += self.calculateDistance(currentCity, previousCity)
 
 			previousCity = currentCity
+
+		firstCity = bestResult['soln'].route[0]
+		cost += self.calculateDistance(firstCity, previousCity)
 
 		return cost
 
@@ -245,11 +249,11 @@ class TSPSolver:
 		cost, newMatrix = self.normalizeMatrix(newMatrix, state.nodeNumber, nextStateInt)
 		newState = BBState(state.level + 1, newMatrix, nextStateInt)
 		newState.path.append(state.nodeNumber)
-		newState.cost = cost
+		newState.cost = state.cost + cost
 		return newState
 
 	#returns cost, newMatrix
-	def normalizeMatrix(self, matrix, rowToClear, columnToClear):
+	def normalizeMatrix(self, matrix, startingStateAndZeroRow, newStateAndZerocolumn):
 		rows = len(matrix)
 		columns = len(matrix[0])
 		cost = 0
@@ -260,16 +264,16 @@ class TSPSolver:
 		columnsToCheck = []
 		#zero out row and column to clear and determine which rows columns need to be normalized
 		for i in range(len(newMatrix)):
-			if newMatrix[i][rowToClear] >= 0:
-				newMatrix[i][rowToClear] = -1
+			if newMatrix[i][newStateAndZerocolumn] >= 0:
+				newMatrix[i][newStateAndZerocolumn] = -1
 				if rowsToCheck.__contains__(i) == False:
 					rowsToCheck.append(i)
 		for i in range(len(newMatrix)):
-			if newMatrix[columnToClear][i] >= 0:
-				newMatrix[columnToClear][i] = -1
+			if newMatrix[startingStateAndZeroRow][i] >= 0:
+				newMatrix[startingStateAndZeroRow][i] = -1
 				if columnsToCheck.__contains__(i) == False:
 					columnsToCheck.append(i)
-		rowsToCheck.remove(columnToClear)
+		rowsToCheck.remove(startingStateAndZeroRow)
 
 		for i in rowsToCheck:
 			smallestVal = INF
@@ -280,13 +284,13 @@ class TSPSolver:
 				newMatrix[i][j] = newMatrix[i][j] - smallestVal
 			cost += smallestVal
 
-		for i in columnsToCheck:
+		for j in columnsToCheck:
 			smallestVal = INF
-			for j in range(rows):
-				if newMatrix[j][i] < smallestVal  and newMatrix[j][i] >= 0:
-					smallestVal = newMatrix[j][i]
-			for j in range(rows):
-				newMatrix[j][i] = newMatrix[j][i] - smallestVal
+			for i in range(rows):
+				if newMatrix[i][j] < smallestVal  and newMatrix[i][j] >= 0:
+					smallestVal = newMatrix[i][j]
+			for i in range(rows):
+				newMatrix[i][j] = newMatrix[i][j] - smallestVal
 			cost += smallestVal
 
 
