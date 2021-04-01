@@ -205,7 +205,11 @@ class TSPSolver:
 		self.upperBound = self.calculateUpperBound()
 		startingState = BBState(0, self.lowerBoundMatrix, 0)
 		startingState.cost = self.lowerBound
+
 		self.doBranch(startingState)
+		while True:#time.time() - start_time < time_allowance:
+			self.doBranch(heapq.heappop(self.pq)[1])
+
 
 	def calculateLowerBound(self):
 		return self.normalizeMatrixInit(self.matrix)
@@ -234,9 +238,11 @@ class TSPSolver:
 	def doBranch(self, state):
 		for i in range(len(self.edges)):
 			if self.edges[state.nodeNumber][i] == True:
-				newState = self.calculateEdge(state, i)
-				if newState.cost < self.upperBound:
-					heapq.heappush(self.pq, (self.calculatePriority(newState.level, newState.cost), newState))
+				if state.path.__contains__(i) == False and len(state.path) < self.numNodes:
+					if state.matrix[state.nodeNumber][i] >= 0:
+						newState = self.calculateEdge(state, i)
+						if newState.cost < self.upperBound:
+							heapq.heappush(self.pq, (self.calculatePriority(newState.level, newState.cost), newState))
 
 
 	#############
@@ -248,6 +254,7 @@ class TSPSolver:
 
 		cost, newMatrix = self.normalizeMatrix(newMatrix, state.nodeNumber, nextStateInt)
 		newState = BBState(state.level + 1, newMatrix, nextStateInt)
+		newState.path.extend(state.path)
 		newState.path.append(state.nodeNumber)
 		newState.cost = state.cost + cost
 		return newState
@@ -275,6 +282,10 @@ class TSPSolver:
 					columnsToCheck.append(i)
 		rowsToCheck.remove(startingStateAndZeroRow)
 
+		#zero out conjugate edge of one currently considering
+		newMatrix[newStateAndZerocolumn][startingStateAndZeroRow] = -1
+
+		#check only the rows and columns that arent' zeroed out
 		for i in rowsToCheck:
 			smallestVal = INF
 			for j in range(columns):
@@ -337,8 +348,8 @@ class TSPSolver:
 
 	#calculates priority score
 	def calculatePriority(self, level, cost):
-		costRatio = self.upperBound - cost/self.upperBound
-		levelRatio = level * self.depthPriority / self.numNodes
+		costRatio = cost/self.upperBound
+		levelRatio = self.numNodes / (level * self.depthPriority) #level * self.depthPriority / self.numNodes
 		return (costRatio + levelRatio) * 100
 
 
