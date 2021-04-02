@@ -20,6 +20,7 @@ import itertools
 NUM_GREEDY_TRIES_BB = 5
 INF = 999999
 
+
 class TSPSolver:
 	def __init__( self, gui_view ):
 		self._scenario = None
@@ -197,6 +198,7 @@ class TSPSolver:
 		self.pq = []
 		self.depthPriority = 10
 		self.numNodes = len(self.cities)
+		self.bestRoutSoFar = []
 		#init adjacency matrix
 		self.matrix = self.makeMatrixFromEdgelist()
 		self.edges = self._scenario.getEdges()
@@ -207,8 +209,32 @@ class TSPSolver:
 		startingState.cost = self.lowerBound
 
 		self.doBranch(startingState)
-		while True:#time.time() - start_time < time_allowance:
-			self.doBranch(heapq.heappop(self.pq)[1])
+		while time.time() - start_time < time_allowance and len(self.pq) > 0:#len(self.pq) > 0:#
+			self.doBranch(heapq.heappop(self.pq))
+
+
+
+		route = []
+		for i in self.bestRoutSoFar:
+			route.append(self.cities[i])
+
+		results = {}
+		foundTour = False
+		bssf = TSPSolution(route)
+		count = len(route)
+		if bssf.cost < np.inf:
+			# Found a valid route
+			foundTour = True
+		end_time = time.time()
+		results['cost'] = bssf.cost if foundTour else 999999
+		results['time'] = end_time - start_time
+		results['count'] = count
+		results['soln'] = bssf
+		results['max'] = None
+		results['total'] = None
+		results['pruned'] = None
+
+		return results
 
 
 	def calculateLowerBound(self):
@@ -233,16 +259,31 @@ class TSPSolver:
 		firstCity = bestResult['soln'].route[0]
 		cost += self.calculateDistance(firstCity, previousCity)
 
+		for i in bestResult['soln'].route:
+			self.bestRoutSoFar.append(i._index)
 		return cost
 
 	def doBranch(self, state):
-		for i in range(len(self.edges)):
-			if self.edges[state.nodeNumber][i] == True:
-				if state.path.__contains__(i) == False and len(state.path) < self.numNodes:
-					if state.matrix[state.nodeNumber][i] >= 0:
-						newState = self.calculateEdge(state, i)
-						if newState.cost < self.upperBound:
-							heapq.heappush(self.pq, (self.calculatePriority(newState.level, newState.cost), newState))
+		# check if newState is the final state in the route and update upper bound if possible
+		if len(state.path) >= self.numNodes - 1:
+			if self.edges[state.nodeNumber][state.path[0]] == True:
+				newState = self.calculateEdge(state, state.path[0])
+				if newState.cost < self.upperBound:
+					print(newState.cost)
+					print(self.upperBound)
+					self.bestRoutSoFar = newState.path
+					self.upperBound = newState.cost
+					print("FOUND SOLUTION")
+		else:
+			for i in range(len(self.edges)):
+				if self.edges[state.nodeNumber][i] == True:
+					if state.path.__contains__(i) == False and len(state.path) < self.numNodes:
+						if state.matrix[state.nodeNumber][i] >= 0:
+							newState = self.calculateEdge(state, i)
+							if newState.cost < self.upperBound:
+								newState.priority = self.calculatePriority(newState.level, newState.cost)
+								heapq.heappush(self.pq, newState)
+
 
 
 	#############
@@ -375,5 +416,10 @@ class BBState:
 		self.nodeNumber = nodeNumber
 		self.cost = 0
 		self.path = []
+		self.priority = math.inf
+
+	def __lt__(self, other):
+		return self.priority < other.priority
+
 
 
