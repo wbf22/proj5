@@ -95,13 +95,13 @@ class TSPSolver:
 		startingCityIndex = 0
 		self.cities = self._scenario.getCities()
 		results = {}
-		#while foundTour == False and startingCityIndex < len(self._scenario.getCities()) - 1:
-		# initialize unvisited[] to all cities
+
 		unvisited = self._scenario.getCities().copy()  # would it be better to just have an array of
 
 
 		startingCity = unvisited[startingCityIndex]
 
+		#keep looping until all nodes are visited, will reset if path isn't complete
 		route = []
 		currentCity = startingCity
 		while len(unvisited) != 0:
@@ -132,6 +132,7 @@ class TSPSolver:
 
 			currentCity = nextCity
 
+		#if no tour was found return default random tour
 		if startingCityIndex == len(self._scenario.getCities()): return self.defaultRandomTour(time_allowance)
 		bssf = TSPSolution(route)
 		count = len(route)
@@ -150,6 +151,7 @@ class TSPSolver:
 
 		return results
 
+	#helps find next city to visit using
 	def findClosestCity(self, currentCity, unvisited):
 
 		# loop through all edges of city1
@@ -234,14 +236,14 @@ class TSPSolver:
 		results = {}
 		foundTour = False
 		bssf = TSPSolution(route)
-		count = self.bestRoutSoFar[1]
 		if bssf.cost < np.inf:
 			# Found a valid route
 			foundTour = True
 		end_time = time.time()
 		results['cost'] = bssf.cost if foundTour else 999999
-		results['time'] = self.bestRoutSoFar[2]
-		results['count'] = count
+		results['time'] = time.time() - self.start_time
+		print(self.bestRoutSoFar[2])
+		results['count'] = self.bestRoutSoFar[1]
 		results['soln'] = bssf
 		results['max'] = self.maxPq
 		results['total'] = self.numStatesMade
@@ -288,9 +290,9 @@ class TSPSolver:
 				if newState.cost < self.upperBound:
 					print(newState.cost)
 					print(self.upperBound)
+					self.intermediateSolutions += 1
 					self.bestRoutSoFar = newState.path, self.intermediateSolutions, time.time() - self.start_time
 					self.upperBound = newState.cost
-					self.intermediateSolutions += 1
 					print("FOUND SOLUTION")
 				else:
 					self.pruned += 1
@@ -310,6 +312,7 @@ class TSPSolver:
 	#############
 	# aux functions
 	#############
+	#detemines cost of edge and new matrix. returns a the newState
 	def calculateEdge(self, state, nextStateInt):
 		self.numStatesMade += 1
 		newMatrix = state.matrix.copy()
@@ -370,6 +373,7 @@ class TSPSolver:
 
 		return cost, newMatrix
 
+	#used only for calculating lower bound
 	def normalizeMatrixInit(self, matrix):
 		rows = len(matrix)
 		columns = len(matrix[0])
@@ -397,6 +401,7 @@ class TSPSolver:
 
 		return cost, newMatrix
 
+	#used for setting up the original matrix. Nonexistant edges left as math.inf
 	def makeMatrixFromEdgelist(self):
 		edges = self._scenario.getEdges()
 		cities = self._scenario.getCities()
@@ -409,11 +414,21 @@ class TSPSolver:
 
 		return matrix
 
-	#calculates priority score
+	#calculates priority score using the states depth/level and it's cost.
+	# favors depth and low cost
+	# Also takes into account how many solution have been found.
+	# When less have been found level is given more priority
+	# a smaller score is higher priority
 	def calculatePriority(self, level, cost):
-		costRatio = cost/self.upperBound
+
+		#ratio for number of solutions so far
+		numSolutionsRatio = (self.numNodes - self.intermediateSolutions) / (self.numNodes * level)  #lots of nodes, high for low level
+		#numSolutionsRatio = 0
+
+		#cost and levels ratio
+		costRatio = cost / self.upperBound
 		levelRatio = self.numNodes / (level * self.depthPriority) #level * self.depthPriority / self.numNodes
-		return (costRatio + levelRatio) * 100
+		return (costRatio + levelRatio + numSolutionsRatio) * 100
 
 
 	''' <summary>
