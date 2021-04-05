@@ -89,15 +89,17 @@ class TSPSolver:
 	startingCity = None
 	finalCity = None
 	def greedy(self, time_allowance=60.0):
+
 		start_time = time.time()
+		foundTour = False
+		startingCityIndex = 0
+		self.cities = self._scenario.getCities()
+		results = {}
+		#while foundTour == False and startingCityIndex < len(self._scenario.getCities()) - 1:
 		# initialize unvisited[] to all cities
 		unvisited = self._scenario.getCities().copy()  # would it be better to just have an array of
-		# sizeof(unvisited) and initialize all values to 0?
-		# previousPointers = []
-		# for c in unvisited:
-		# 	previousPointers.append(self.cityData(None, c))
 
-		startingCityIndex = 0
+
 		startingCity = unvisited[startingCityIndex]
 
 		route = []
@@ -108,9 +110,8 @@ class TSPSolver:
 			# find shortest path to city2 from current city1
 			nextCity = self.findClosestCity(currentCity, unvisited)
 
-			# update previous pointers
-			# previousPointers[nextCity._index].previous = currentCity
 			if len(unvisited) == 0:
+				#reset if failed at end of tour
 				if self.checkLastCity(startingCity, currentCity) == False:
 					startingCityIndex += 1
 					unvisited = self._scenario.getCities().copy()
@@ -118,23 +119,26 @@ class TSPSolver:
 					currentCity = unvisited[startingCityIndex]
 					nextCity = currentCity
 					continue
-				else: break
+				else:#break if successful
+					break
 
+			#reset if failed attempt midway through tour
 			if nextCity == currentCity:
 				startingCityIndex += 1
 				unvisited = self._scenario.getCities().copy()
 				route.clear()
+				if startingCityIndex >= len(unvisited): break
 				currentCity = unvisited[startingCityIndex]
 
 			currentCity = nextCity
 
-		results = {}
-		foundTour = False
+		if startingCityIndex == len(self._scenario.getCities()): return self.defaultRandomTour(time_allowance)
 		bssf = TSPSolution(route)
 		count = len(route)
 		if bssf.cost < np.inf:
 			# Found a valid route
 			foundTour = True
+
 		end_time = time.time()
 		results['cost'] = bssf.cost if foundTour else 999999
 		results['time'] = end_time - start_time
@@ -172,12 +176,12 @@ class TSPSolver:
 
 
 	def calculateDistance(self, city1, city2):
-		y = city1._y - city2._y
-		x = city1._x - city2._x
+		# y = city1._y - city2._y
+		# x = city1._x - city2._x
+		#
+		# dist = np.sqrt(y**2 + x**2) * 1000
 
-		dist = np.sqrt(y**2 + x**2) * 1000
-
-		return dist
+		return city1.costTo(city2)
 
 	
 	''' <summary>
@@ -193,60 +197,71 @@ class TSPSolver:
 	# core functions
 	#############
 	def branchAndBound( self, time_allowance=60.0 ):
-		start_time = time.time()
+		self.start_time = time.time()
 		self.cities = self._scenario.getCities()
 		self.pq = []
 		self.depthPriority = 10
 		self.numNodes = len(self.cities)
 		self.bestRoutSoFar = []
-		#init adjacency matrix
+		self.intermediateSolutions = 0
+		self.numStatesMade = 0
+		self.maxPq = 0
+		self.pruned = 0
+
+		#init adjacency matrix for lower bound
 		self.matrix = self.makeMatrixFromEdgelist()
 		self.edges = self._scenario.getEdges()
-
+		#make lower bound with above matrix
 		self.lowerBound, self.lowerBoundMatrix = self.calculateLowerBound()
+
+		#make upper bound with greedy. I used the one we made in our group project
 		self.upperBound = self.calculateUpperBound()
 		startingState = BBState(0, self.lowerBoundMatrix, 0)
 		startingState.cost = self.lowerBound
 
+		#keep branching on the best state. States are prioritized by 'calculatePriority' function below
 		self.doBranch(startingState)
-		while time.time() - start_time < time_allowance and len(self.pq) > 0:#len(self.pq) > 0:#
+		while time.time() - self.start_time < time_allowance and len(self.pq) > 0:#len(self.pq) > 0:#
+			if len(self.pq) > self.maxPq: self.maxPq = len(self.pq)
 			self.doBranch(heapq.heappop(self.pq))
 
 
 
 		route = []
-		for i in self.bestRoutSoFar:
+		for i in self.bestRoutSoFar[0]:
 			route.append(self.cities[i])
 
 		results = {}
 		foundTour = False
 		bssf = TSPSolution(route)
-		count = len(route)
+		count = self.bestRoutSoFar[1]
 		if bssf.cost < np.inf:
 			# Found a valid route
 			foundTour = True
 		end_time = time.time()
 		results['cost'] = bssf.cost if foundTour else 999999
-		results['time'] = end_time - start_time
+		results['time'] = self.bestRoutSoFar[2]
 		results['count'] = count
 		results['soln'] = bssf
-		results['max'] = None
-		results['total'] = None
-		results['pruned'] = None
+		results['max'] = self.maxPq
+		results['total'] = self.numStatesMade
+		self.pruned += len(self.pq)
+		results['pruned'] = self.pruned
 
 		return results
 
-
+	#lowerbound function
 	def calculateLowerBound(self):
 		return self.normalizeMatrixInit(self.matrix)
 
+	#upperbound function, just does greedy
 	def calculateUpperBound(self):
-		#TODO make greedy change starting node
+
 		bestResult = self.greedy(60.0)
-		for i in range(NUM_GREEDY_TRIES_BB):
-			result = self.greedy(60.0)
-			if result['cost'] < bestResult['cost']:
-				bestResult = result
+		# for i in range(NUM_GREEDY_TRIES_BB):
+		# 	result = self.greedy(60.0)
+		# 	if result['cost'] < bestResult['cost']:
+		# 		bestResult = result
 
 		cost = 0
 		previousCity = None
@@ -261,8 +276,10 @@ class TSPSolver:
 
 		for i in bestResult['soln'].route:
 			self.bestRoutSoFar.append(i._index)
+		self.bestRoutSoFar = self.bestRoutSoFar, 0, 0
 		return cost
 
+	#consider one state, make child states and prune those above upperbound. child states are assign their priority here
 	def doBranch(self, state):
 		# check if newState is the final state in the route and update upper bound if possible
 		if len(state.path) >= self.numNodes - 1:
@@ -271,9 +288,12 @@ class TSPSolver:
 				if newState.cost < self.upperBound:
 					print(newState.cost)
 					print(self.upperBound)
-					self.bestRoutSoFar = newState.path
+					self.bestRoutSoFar = newState.path, self.intermediateSolutions, time.time() - self.start_time
 					self.upperBound = newState.cost
+					self.intermediateSolutions += 1
 					print("FOUND SOLUTION")
+				else:
+					self.pruned += 1
 		else:
 			for i in range(len(self.edges)):
 				if self.edges[state.nodeNumber][i] == True:
@@ -283,13 +303,15 @@ class TSPSolver:
 							if newState.cost < self.upperBound:
 								newState.priority = self.calculatePriority(newState.level, newState.cost)
 								heapq.heappush(self.pq, newState)
-
+							else:
+								self.pruned += 1
 
 
 	#############
 	# aux functions
 	#############
 	def calculateEdge(self, state, nextStateInt):
+		self.numStatesMade += 1
 		newMatrix = state.matrix.copy()
 
 
@@ -304,9 +326,9 @@ class TSPSolver:
 	def normalizeMatrix(self, matrix, startingStateAndZeroRow, newStateAndZerocolumn):
 		rows = len(matrix)
 		columns = len(matrix[0])
-		cost = 0
+		cost = matrix[startingStateAndZeroRow][newStateAndZerocolumn]
 		newMatrix = matrix.copy()
-		#TODO make sure it works and see why some city distances are zero
+
 
 		rowsToCheck = []
 		columnsToCheck = []
